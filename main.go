@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/contrib/snapshotservice"
-	"github.com/containerd/containerd/v2/plugins/snapshots/native"
+	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/services/content/contentserver"
+	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
 )
 
 func main() {
@@ -24,11 +28,13 @@ func main() {
 	// Create a gRPC server
 	rpc := grpc.NewServer()
 
-	// Configure your custom snapshotter, this example uses the native
-	// snapshotter and a root directory. Your custom snapshotter will be
-	// much more useful than using a snapshotter which is already included.
-	// https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter
-	sn, err := native.NewSnapshotter(os.Args[2])
+	sn, err := overlay.NewSnapshotter(filepath.Join(os.Args[2], "snapshotter"))
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	st, err := local.NewStore(filepath.Join(os.Args[2], "store"))
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
@@ -36,10 +42,14 @@ func main() {
 
 	// Convert the snapshotter to a gRPC service,
 	// example in github.com/containerd/containerd/contrib/snapshotservice
-	service := snapshotservice.FromSnapshotter(sn)
+	snService := snapshotservice.FromSnapshotter(sn)
 
-	// Register the service with the gRPC server
-	snapshotsapi.RegisterSnapshotsServer(rpc, service)
+	// Convert the content store to a gRPC service,
+	stService := contentserver.New(st)
+
+	// Register the services with the gRPC server
+	snapshotsapi.RegisterSnapshotsServer(rpc, snService)
+	contentapi.RegisterContentServer(rpc, stService)
 
 	// Listen and serve
 	l, err := net.Listen("unix", os.Args[1])

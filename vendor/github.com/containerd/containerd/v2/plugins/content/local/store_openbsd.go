@@ -1,4 +1,4 @@
-//go:build !freebsd
+//go:build openbsd
 
 /*
    Copyright The containerd Authors.
@@ -16,8 +16,18 @@
    limitations under the License.
 */
 
-package native
+package local
 
-const mountType = "bind"
+import (
+	"os"
+	"syscall"
+	"time"
+)
 
-var defaultMountOptions = []string{"rbind"}
+func getATime(fi os.FileInfo) time.Time {
+	if st, ok := fi.Sys().(*syscall.Stat_t); ok {
+		return time.Unix(st.Atim.Unix())
+	}
+
+	return fi.ModTime()
+}

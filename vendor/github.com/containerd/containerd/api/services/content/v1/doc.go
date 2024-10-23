@@ -14,8 +14,4 @@
    limitations under the License.
 */
 
-package native
-
-const mountType = "nullfs"
-
-var defaultMountOptions = []string{}
+package content

@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
 	"github.com/containerd/platforms"
-	"github.com/davidcassany/mysnapshotter/pkg/logger"
+	"github.com/davidcassany/containerdosstore/pkg/logger"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )

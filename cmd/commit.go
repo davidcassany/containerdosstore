@@ -17,7 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/davidcassany/mysnapshotter/pkg/containerdosstore"
+	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
 	"github.com/spf13/cobra"
 )
 

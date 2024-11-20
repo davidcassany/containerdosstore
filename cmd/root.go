@@ -19,8 +19,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/davidcassany/mysnapshotter/pkg/containerdosstore"
-	"github.com/davidcassany/mysnapshotter/pkg/logger"
+	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
+	"github.com/davidcassany/containerdosstore/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +28,7 @@ var cs containerdosstore.ContainerdOSStore
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "mysnapshotter",
+	Use:   "containerdosstore",
 	Short: "A daememon less client for a local image containerd store",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

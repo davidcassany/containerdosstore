@@ -16,7 +16,7 @@ limitations under the License.
 
 package main
 
-import "github.com/davidcassany/mysnapshotter/cmd"
+import "github.com/davidcassany/containerdosstore/cmd"
 
 func main() {
 	cmd.Execute()

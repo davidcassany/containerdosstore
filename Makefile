@@ -5,4 +5,4 @@ LDFLAGS:=-w -s
 
 .PHONY: build
 build:
-	go build -ldflags '$(LDFLAGS)' -mod=vendor -o build/snapshotter
+	go build -ldflags '$(LDFLAGS)' -mod=vendor -o build/osstore

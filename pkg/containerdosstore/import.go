@@ -14,10 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package containerdosstore
 
-import "github.com/davidcassany/mysnapshotter/cmd"
+import (
+	"errors"
+	"io"
 
-func main() {
-	cmd.Execute()
+	"github.com/containerd/containerd/v2/client"
+)
+
+func (c *ContainerdOSStore) Import(reader io.Reader, opts ...client.ImportOpt) ([]client.Image, error) {
+	if !c.IsInitiated() {
+		return nil, errors.New(missInitErrMsg)
+	}
+
+	images := []client.Image{}
+	imgs, err := c.cli.Import(c.ctx, reader, opts...)
+	if err != nil {
+		return nil, err
+	}
+	for _, img := range imgs {
+		images = append(images, client.NewImage(c.cli, img))
+	}
+
+	return images, nil
 }

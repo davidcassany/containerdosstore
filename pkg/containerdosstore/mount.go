@@ -29,7 +29,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 )
 
-func (c *ContainerdOSStore) MountFromScratch(target string, key string) (snapshotKey string, retErr error) {
+func (c *ContainerdOSStore) MountFromScratch(target string, key string) (string, error) {
 	return c.Mount(nil, target, key, false)
 }
 
@@ -39,7 +39,8 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 	}
 
 	if key == "" {
-		key = target
+		// TODO sanitize target string? this is a path, sould be fine but ugly
+		key = uniquePart() + "-" + target
 	}
 
 	//TODO handle lease properly, whats the purpose of it?

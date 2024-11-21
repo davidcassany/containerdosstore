@@ -18,7 +18,9 @@ package containerdosstore
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"os"
 
 	"github.com/containerd/containerd/v2/client"
 )
@@ -38,4 +40,55 @@ func (c *ContainerdOSStore) Import(reader io.Reader, opts ...client.ImportOpt) (
 	}
 
 	return images, nil
+}
+
+func (c *ContainerdOSStore) ImportFile(file string, opts ...client.ImportOpt) (img []client.Image, retErr error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err := r.Close()
+		if err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
+
+	img, err = c.Import(r, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return img, nil
+}
+
+func (c *ContainerdOSStore) SingleImportFile(file string, opts ...client.ImportOpt) (client.Image, error) {
+	images, err := c.ImportFile(file, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if len(images) == 0 {
+		return nil, fmt.Errorf("something went wrong, no images imported")
+	}
+
+	if len(images) > 1 {
+		var dErrs []error
+		delImg := func(img client.Image) {
+			err = c.Delete(img.Name())
+			if err != nil {
+				c.log.Errorf("cound not delete imported image '%s': %v", img.Name(), err)
+				dErrs = append(dErrs, err)
+			}
+		}
+
+		c.log.Warnf("imported '%d' images. Only keeping first one", len(images))
+		for _, img := range images[1:] {
+			delImg(img)
+		}
+		if len(dErrs) > 0 {
+			delImg(images[0])
+			return nil, fmt.Errorf("failed removing imported images")
+		}
+	}
+	return images[0], nil
 }

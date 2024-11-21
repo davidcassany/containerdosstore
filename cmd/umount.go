@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -36,8 +38,8 @@ var umountCmd = &cobra.Command{
 
 		log := cs.Logger()
 
-		if key == "" {
-			key = target
+		if key == "" && (rmAllSnap || rmActiveSnap) {
+			return errors.New("snapshot key is required to delete snapshots")
 		}
 
 		if rmAllSnap {
@@ -58,7 +60,7 @@ var umountCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(umountCmd)
 
-	umountCmd.Flags().String("snapshot-key", "", "The key of the snapshot to delete, mountpoint is used as a key if not set")
+	umountCmd.Flags().String("snapshot-key", "", "The key of the snapshot to delete")
 	umountCmd.Flags().Bool("remove-active", false, "Removes the unmounted active snapshot")
 	umountCmd.Flags().Bool("remove-all", false, "Removes all snapshots under active too, stops walking the chain if the target snapshot has childs")
 	umountCmd.MarkFlagsMutuallyExclusive("remove-active", "remove-all")

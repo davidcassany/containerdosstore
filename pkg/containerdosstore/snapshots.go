@@ -37,6 +37,18 @@ func (c *ContainerdOSStore) ListSnapshots(filters ...string) ([]snapshots.Info, 
 	return listSnapshots(c.ctx, sn, filters...)
 }
 
+func (c *ContainerdOSStore) GetSnapshot(key string) (snapshots.Info, error) {
+	var info snapshots.Info
+	if !c.IsInitiated() {
+		return info, errors.New(missInitErrMsg)
+	}
+
+	//TODO handle lease
+
+	sn := c.cli.SnapshotService(c.driver)
+	return sn.Stat(c.ctx, key)
+}
+
 func listSnapshots(ctx context.Context, sn snapshots.Snapshotter, filters ...string) ([]snapshots.Info, error) {
 	var snaps []snapshots.Info
 	walkFunc := func(ctx context.Context, info snapshots.Info) error {

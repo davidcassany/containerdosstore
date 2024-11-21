@@ -41,13 +41,14 @@ import (
 )
 
 const (
-	overlayDriver = "overlay"
+	overlayDriver = "overlayfs"
 	snapshotsDir  = "snapshots"
 	boltDbFile    = "metadata.db"
 	contentDir    = "content"
 	namespace     = "elemental-system"
 
-	DefaultRoot = "/tmp/contentstore"
+	DefaultRoot         = "/tmp/contentstore"
+	LabelSnapshotImgRef = "containerd.io/snapshot/image.ref"
 
 	missInitErrMsg = "uninitiated containerdstore instance"
 )

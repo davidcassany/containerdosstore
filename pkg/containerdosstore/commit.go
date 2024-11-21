@@ -75,7 +75,7 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 	var baseImgConfig ocispec.Image
 	var baseMfst *ocispec.Manifest
 
-	if imgRef, ok := info.Labels["containerd.io/gc.ref.image"]; ok {
+	if imgRef, ok := info.Labels[LabelSnapshotImgRef]; ok {
 		baseImage, err := c.Get(imgRef)
 		if err != nil {
 			return nil, err

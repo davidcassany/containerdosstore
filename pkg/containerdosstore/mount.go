@@ -33,7 +33,7 @@ func (c *ContainerdOSStore) MountFromScratch(target string, key string) (string,
 	return c.Mount(nil, target, key, false)
 }
 
-func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, readonly bool) (snapshotKey string, retErr error) {
+func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, readonly bool, opts ...snapshots.Opt) (snapshotKey string, retErr error) {
 	if !c.IsInitiated() {
 		return "", errors.New(missInitErrMsg)
 	}
@@ -62,12 +62,13 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 	// TODO create and/or check target existence?
 
 	var parent string
-	var labels map[string]string
+	labels := map[string]string{
+		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	}
 
 	// TODO properly name labels
 	if img == nil {
 		parent = ""
-		labels = map[string]string{}
 	} else {
 		diffIDs, err := img.RootFS(ctx)
 		if err != nil {
@@ -75,14 +76,13 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 		}
 		parent = identity.ChainID(diffIDs).String()
 		labels = map[string]string{
-			"containerd.io/gc.ref.image": img.Name(),
+			LabelSnapshotImgRef: img.Name(),
 		}
 	}
 
 	sn := c.cli.SnapshotService(c.driver)
-	opts := []snapshots.Opt{
-		snapshots.WithLabels(labels),
-	}
+
+	opts = append(opts, snapshots.WithLabels(labels))
 
 	var mounts []mount.Mount
 	if readonly {

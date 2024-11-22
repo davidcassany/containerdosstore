@@ -70,7 +70,7 @@ type ContainerdOSStore struct {
 func NewContainerdOSStore(log logger.Logger, root string) ContainerdOSStore {
 	return ContainerdOSStore{
 		root: root, driver: overlayDriver, namespace: namespace,
-		log: log, platform: platforms.Default(),
+		log: log, platform: platforms.DefaultStrict(),
 	}
 }
 

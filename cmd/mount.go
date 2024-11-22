@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"github.com/containerd/containerd/v2/client"
+	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
 	"github.com/spf13/cobra"
 )
 
@@ -36,30 +37,33 @@ var mountCmd = &cobra.Command{
 		scratch, _ := flags.GetBool("from-scratch")
 		target := args[0]
 
-		// TODO create/check target?
 		var img client.Image
 		var err error
-		log := cs.Logger()
 
-		if !scratch {
-			img, err = cs.Get(name)
+		if scratch {
+			key, err = cs.MountFromScratch(target, key)
 			if err != nil {
 				return err
 			}
-
-			if unpack {
-				err = cs.Unpack(img)
-				if err != nil {
-					return err
-				}
-			}
+			cs.Logger().Infof("Createad mount from scratch with key: %s", key)
+			return nil
 		}
 
-		key, err = cs.Mount(img, target, key, readOnly)
+		mOpts := []containerdosstore.MountOpt{}
+		if unpack {
+			mOpts = append(mOpts, containerdosstore.WithMountUnpack())
+		}
+
+		img, err = cs.Get(name)
 		if err != nil {
 			return err
 		}
-		log.Infof("Snapshot '%s' mounted at '%s'", key, target)
+
+		key, err = cs.Mount(img, target, key, readOnly, mOpts...)
+		if err != nil {
+			return err
+		}
+		cs.Logger().Infof("Createad mount from '%s' with key: %s", img.Name(), key)
 		return nil
 	},
 }

@@ -34,7 +34,13 @@ func (c *ContainerdOSStore) ListSnapshots(filters ...string) ([]snapshots.Info, 
 
 	sn := c.cli.SnapshotService(c.driver)
 
-	return listSnapshots(c.ctx, sn, filters...)
+	infos, err := listSnapshots(c.ctx, sn, filters...)
+	if err != nil && errdefs.IsNotFound(err) {
+		c.log.Warnf("returned a IsNotFound error, this is likely to mean no snapshot has been ever created yet in current content store")
+		return infos, nil
+	}
+
+	return infos, err
 }
 
 func (c *ContainerdOSStore) GetSnapshot(key string) (snapshots.Info, error) {
@@ -56,7 +62,14 @@ func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...st
 
 	//TODO handle lease
 
-	return c.updateSnapshot(c.ctx, info, fieldpaths...)
+	info, err := c.updateSnapshot(c.ctx, info, fieldpaths...)
+	if err != nil {
+		c.log.Errorf("failed to update snapshot '%s': %v", info.Name, err)
+		return info, err
+	}
+
+	c.log.Infof("Successfully updated snapshot '%s'", info.Name)
+	return info, nil
 }
 
 func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string) error {
@@ -74,7 +87,13 @@ func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string)
 	}
 
 	_, err = c.labelSnapshot(ctx, info, labels)
-	return err
+	if err != nil {
+		c.log.Errorf("failed to update snapshot '%s': %v", info.Name, err)
+		return err
+	}
+
+	c.log.Infof("Successfully updated snapshot '%s'", info.Name)
+	return nil
 }
 
 func (c *ContainerdOSStore) RemoveSnapshotLabels(name string, labelKeys ...string) error {
@@ -92,7 +111,13 @@ func (c *ContainerdOSStore) RemoveSnapshotLabels(name string, labelKeys ...strin
 	}
 
 	_, err = c.removeSnapshotLabels(ctx, info, labelKeys...)
-	return err
+	if err != nil {
+		c.log.Errorf("failed to update snapshot '%s': %v", info.Name, err)
+		return err
+	}
+
+	c.log.Infof("Successfully updated snapshot '%s'", info.Name)
+	return nil
 }
 
 func listSnapshots(ctx context.Context, sn snapshots.Snapshotter, filters ...string) ([]snapshots.Info, error) {
@@ -124,8 +149,7 @@ func removeSnapshotsChain(ctx context.Context, s snapshots.Snapshotter, key stri
 		}
 		if err := s.Remove(ctx, key); err != nil {
 			// We can't remove snapshots having childs, attempting so returns a failed precondition
-			// We only consider it an error if the very first one fails
-			if errdefs.IsFailedPrecondition(err) && step != 0 {
+			if errdefs.IsFailedPrecondition(err) {
 				return nil
 			}
 			return fmt.Errorf("error removing snapshot: %w", err)

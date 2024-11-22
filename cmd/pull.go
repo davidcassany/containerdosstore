@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
 	"github.com/spf13/cobra"
 )
 
@@ -27,21 +28,17 @@ var pullCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	PreRunE: initCS,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log := cs.Logger()
 		flags := cmd.Flags()
 		unpack, _ := flags.GetBool("unpack")
-		img, err := cs.Pull(args[0])
-		if err == nil {
-			log.Infof("Pulled image '%s' with digest '%s'", img.Name(), img.Metadata().Target.Digest)
-		}
+		pOpts := []containerdosstore.PullOpt{}
+
 		if unpack {
-			err = cs.Unpack(img)
-			if err != nil {
-				return err
-			}
-			log.Infof("Unpacked image '%s'", img.Name())
+			pOpts = append(pOpts, containerdosstore.WithPullUnpack())
 		}
-		return nil
+
+		_, err := cs.Pull(args[0], pOpts...)
+
+		return err
 	},
 }
 

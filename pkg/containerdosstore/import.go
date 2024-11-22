@@ -17,6 +17,7 @@ limitations under the License.
 package containerdosstore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,59 +26,92 @@ import (
 	"github.com/containerd/containerd/v2/client"
 )
 
-func (c *ContainerdOSStore) Import(reader io.Reader, opts ...client.ImportOpt) ([]client.Image, error) {
+type ImportOpts struct {
+	iOpts  []client.ImportOpt
+	aOpts  []ApplyCommitOpt
+	unpack bool
+}
+
+type ImportOpt func(*ImportOpts) error
+
+func WithImportUnpack() ImportOpt {
+	return func(iOpts *ImportOpts) error {
+		iOpts.unpack = true
+		return nil
+	}
+}
+
+func WithImportOpts(opts ...client.ImportOpt) ImportOpt {
+	return func(iOpts *ImportOpts) error {
+		iOpts.iOpts = append(iOpts.iOpts, opts...)
+		return nil
+	}
+}
+
+func WithImportApplyCommitOpts(opts ...ApplyCommitOpt) ImportOpt {
+	return func(iOpts *ImportOpts) error {
+		iOpts.aOpts = append(iOpts.aOpts, opts...)
+		return nil
+	}
+}
+
+func (c *ContainerdOSStore) Import(reader io.Reader, opts ...ImportOpt) ([]client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	// TODO add unpack option
 	// TODO handle lease
+	ctx := c.ctx
 
-	images := []client.Image{}
-	imgs, err := c.cli.Import(c.ctx, reader, opts...)
+	images, err := c.importFunc(ctx, reader, opts...)
 	if err != nil {
-		return nil, err
+		c.log.Error("failed importing from reader interface")
 	}
-	for _, img := range imgs {
-		images = append(images, client.NewImage(c.cli, img))
+
+	c.log.Infof("Successfully imported %d image(s)", len(images))
+	return images, nil
+}
+
+func (c *ContainerdOSStore) ImportFile(file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
+	if !c.IsInitiated() {
+		return nil, errors.New(missInitErrMsg)
 	}
+
+	// TODO handle lease
+	ctx := c.ctx
+
+	images, err := c.importFile(ctx, file, opts...)
+	if err != nil {
+		c.log.Errorf("failed importing from file '%s'", file)
+	}
+
+	c.log.Infof("Successfully imported %d image(s) from '%s'", len(images), file)
 
 	return images, nil
 }
 
-func (c *ContainerdOSStore) ImportFile(file string, opts ...client.ImportOpt) (img []client.Image, retErr error) {
-	r, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err := r.Close()
-		if err != nil && retErr == nil {
-			retErr = err
-		}
-	}()
-
-	img, err = c.Import(r, opts...)
-	if err != nil {
-		return nil, err
+func (c *ContainerdOSStore) SingleImportFile(file string, opts ...ImportOpt) (_ client.Image, retErr error) {
+	if !c.IsInitiated() {
+		return nil, errors.New(missInitErrMsg)
 	}
 
-	return img, nil
-}
+	// TODO handle lease
+	ctx := c.ctx
 
-func (c *ContainerdOSStore) SingleImportFile(file string, opts ...client.ImportOpt) (client.Image, error) {
-	images, err := c.ImportFile(file, opts...)
+	images, err := c.importFile(ctx, file, opts...)
 	if err != nil {
-		return nil, err
+		c.log.Errorf("failed importing from file '%s'", file)
 	}
+
 	if len(images) == 0 {
+		c.log.Errorf("no images imported from file '%s'", file)
 		return nil, fmt.Errorf("something went wrong, no images imported")
 	}
 
 	if len(images) > 1 {
 		var dErrs []error
 		delImg := func(img client.Image) {
-			err = c.Delete(img.Name())
+			err = c.delete(ctx, img.Name())
 			if err != nil {
 				c.log.Errorf("cound not delete imported image '%s': %v", img.Name(), err)
 				dErrs = append(dErrs, err)
@@ -93,5 +127,58 @@ func (c *ContainerdOSStore) SingleImportFile(file string, opts ...client.ImportO
 			return nil, fmt.Errorf("failed removing imported images")
 		}
 	}
+	c.log.Infof("Successfully imported '%s' image from '%s'", images[0].Name(), file)
 	return images[0], nil
+}
+
+func (c *ContainerdOSStore) importFunc(ctx context.Context, reader io.Reader, opts ...ImportOpt) ([]client.Image, error) {
+	// TODO add unpack option
+	iOpts := &ImportOpts{
+		iOpts: []client.ImportOpt{},
+		aOpts: []ApplyCommitOpt{},
+	}
+	for _, o := range opts {
+		err := o(iOpts)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	images := []client.Image{}
+	imgs, err := c.cli.Import(ctx, reader, iOpts.iOpts...)
+	if err != nil {
+		return nil, err
+	}
+	var uErrs []error
+	for _, img := range imgs {
+		image := client.NewImage(c.cli, img)
+		images = append(images, image)
+		if iOpts.unpack {
+			err = c.unpack(ctx, image, iOpts.aOpts...)
+			if err != nil {
+				c.log.Errorf("failed to unpack image '%s': %v", img.Name, err)
+				uErrs = append(uErrs, err)
+			}
+		}
+	}
+	if len(uErrs) > 0 {
+		return images, fmt.Errorf("failed unpacking some image")
+	}
+
+	return images, nil
+}
+
+func (c *ContainerdOSStore) importFile(ctx context.Context, file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err := r.Close()
+		if err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
+
+	return c.importFunc(ctx, r, opts...)
 }

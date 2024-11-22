@@ -17,9 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-	"os"
-
+	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
 	"github.com/spf13/cobra"
 )
 
@@ -33,36 +31,18 @@ var importCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		flags := cmd.Flags()
 		unpack, _ := flags.GetBool("unpack")
-		log := cs.Logger()
+		file := args[0]
 
-		r, err := os.Open(args[0])
+		opts := []containerdosstore.ImportOpt{}
+		if unpack {
+			opts = append(opts, containerdosstore.WithImportUnpack())
+		}
+
+		_, err := cs.ImportFile(file, opts...)
 		if err != nil {
 			return err
 		}
 
-		imgs, err := cs.Import(r)
-		cErr := r.Close()
-		if cErr != nil {
-			return cErr
-		}
-		if err != nil {
-			return err
-		}
-
-		var uErrs []error
-		for _, img := range imgs {
-			log.Infof("Imported `%s`", img.Name())
-			if unpack {
-				uErr := cs.Unpack(img)
-				if uErr != nil {
-					log.Errorf("error unpackging image '%s': %v", img.Name(), uErr)
-					uErrs = append(uErrs, uErr)
-				}
-			}
-		}
-		if len(uErrs) > 0 {
-			return fmt.Errorf("failed unpacking images: %v", uErrs)
-		}
 		return nil
 	},
 }

@@ -28,7 +28,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (c *ContainerdOSStore) Unpack(img client.Image, opts ...client.UnpackOpt) error {
+func (c *ContainerdOSStore) Unpack(img client.Image, opts ...ApplyCommitOpt) error {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -36,22 +36,40 @@ func (c *ContainerdOSStore) Unpack(img client.Image, opts ...client.UnpackOpt) e
 	//TODO handle lease
 	ctx := c.ctx
 
-	return c.unpack(ctx, img, opts...)
+	err := c.unpack(ctx, img, opts...)
+	if err != nil {
+		c.log.Errorf("failed to unpack image '%s': %v", img.Name(), err)
+		return err
+	}
+
+	c.log.Infof("Successfully unpacked image '%s'", img.Name())
+	return nil
 }
 
-func (c *ContainerdOSStore) unpack(ctx context.Context, img client.Image, opts ...client.UnpackOpt) error {
+func (c *ContainerdOSStore) unpack(ctx context.Context, img client.Image, opts ...ApplyCommitOpt) error {
 	if ok, err := img.IsUnpacked(ctx, c.driver); !ok {
 		if err != nil {
 			return err
+		}
+
+		cOpt := &ApplyCommitOpts{
+			sOpts: []snapshots.Opt{},
+			aOpts: []diff.ApplyOpt{},
+		}
+		for _, o := range opts {
+			err := o(cOpt)
+			if err != nil {
+				return err
+			}
 		}
 
 		uPlat := unpack.Platform{
 			Platform:       c.platform,
 			SnapshotterKey: c.driver,
 			Snapshotter:    c.cli.SnapshotService(c.driver),
-			SnapshotOpts:   []snapshots.Opt{},
+			SnapshotOpts:   cOpt.sOpts,
 			Applier:        c.cli.DiffService(),
-			ApplyOpts:      []diff.ApplyOpt{},
+			ApplyOpts:      cOpt.aOpts,
 		}
 
 		unpacker, err := unpack.NewUnpacker(ctx, c.cli.ContentStore(), unpack.WithUnpackPlatform(uPlat))
@@ -65,7 +83,7 @@ func (c *ContainerdOSStore) unpack(ctx context.Context, img client.Image, opts .
 			return images.Children(ctx, c.cli.ContentStore(), desc)
 		}
 		var handler images.Handler
-		handler = images.Handlers(handlerFunc)
+		handler = images.Handlers(images.FilterPlatforms(handlerFunc, c.platform))
 
 		handler = unpacker.Unpack(handler)
 
@@ -86,12 +104,4 @@ func (c *ContainerdOSStore) unpack(ctx context.Context, img client.Image, opts .
 
 	}
 	return nil
-}
-
-// WithUnpackSnapshotOpts appends new snapshot options on the UnpackConfig.
-func WithUnpackSnapshotOpts(opts ...snapshots.Opt) client.UnpackOpt {
-	return func(ctx context.Context, uc *client.UnpackConfig) error {
-		uc.SnapshotOpts = append(uc.SnapshotOpts, opts...)
-		return nil
-	}
 }

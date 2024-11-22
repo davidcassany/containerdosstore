@@ -17,6 +17,7 @@ limitations under the License.
 package containerdosstore
 
 import (
+	"context"
 	"errors"
 
 	"github.com/containerd/containerd/v2/client"
@@ -58,26 +59,14 @@ func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) error 
 	//TODO handle lease
 	ctx := c.ctx
 
-	img, err := c.cli.GetImage(ctx, name)
+	err := c.delete(ctx, name, opts...)
 	if err != nil {
-		return err
-	}
-	if ok, err := img.IsUnpacked(ctx, c.driver); ok {
-		diffIDs, err := img.RootFS(ctx)
-		if err != nil {
-			return err
-		}
-		chainID := identity.ChainID(diffIDs).String()
-		sn := c.cli.SnapshotService(c.driver)
-		err = removeSnapshotsChain(ctx, sn, chainID, -1)
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
+		c.log.Errorf("failed deleting image '%s': %v", name, err)
 		return err
 	}
 
-	return c.cli.ImageService().Delete(ctx, name, opts...)
+	c.log.Infof("Successfully deleted image '%s'", name)
+	return nil
 }
 
 func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (client.Image, error) {
@@ -108,4 +97,27 @@ func (c *ContainerdOSStore) Create(img images.Image) (client.Image, error) {
 	}
 
 	return client.NewImage(c.cli, i), nil
+}
+
+func (c *ContainerdOSStore) delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+	img, err := c.cli.GetImage(ctx, name)
+	if err != nil {
+		return err
+	}
+	if ok, err := img.IsUnpacked(ctx, c.driver); ok {
+		diffIDs, err := img.RootFS(ctx)
+		if err != nil {
+			return err
+		}
+		chainID := identity.ChainID(diffIDs).String()
+		sn := c.cli.SnapshotService(c.driver)
+		err = removeSnapshotsChain(ctx, sn, chainID, -1)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	return c.cli.ImageService().Delete(ctx, name, opts...)
 }

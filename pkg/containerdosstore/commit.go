@@ -86,7 +86,7 @@ func WithApplyOpts(opts ...diff.ApplyOpt) ApplyCommitOpt {
 	}
 }
 
-func WithApplyCommitOpts(opts ...ApplyCommitOpt) CommitImgOpt {
+func WithImgApplyCommitOpts(opts ...ApplyCommitOpt) CommitImgOpt {
 	return func(co *CommitImgOpts) error {
 		for _, o := range opts {
 			err := o(&co.ApplyCommitOpts)
@@ -98,7 +98,7 @@ func WithApplyCommitOpts(opts ...ApplyCommitOpt) CommitImgOpt {
 	}
 }
 
-func WithImgOpts(iOpts ImgOpts) CommitImgOpt {
+func WithImgCommitOpts(iOpts ImgOpts) CommitImgOpt {
 	return func(co *CommitImgOpts) error {
 		co.iOpts = iOpts
 		return nil
@@ -206,10 +206,11 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (cl
 
 	// unpack the image to snapshotter
 	cimg := client.NewImage(c.cli, img)
-	if err := cimg.Unpack(ctx, c.driver); err != nil {
+	if err := c.unpack(ctx, cimg); err != nil {
 		return nil, err
 	}
 
+	c.log.Infof("Successfully committed image '%s'", cimg.Name())
 	return cimg, nil
 }
 

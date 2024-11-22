@@ -29,17 +29,11 @@ var deleteCmd = &cobra.Command{
 	PreRunE: initCS,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		log := cs.Logger()
 
-		img, err := cs.Get(name)
+		err := cs.Delete(name)
 		if err != nil {
 			return err
 		}
-		err = cs.Delete(name)
-		if err != nil {
-			return err
-		}
-		log.Infof("Image '%s' with digest '%s' deleted\n", img.Name(), img.Metadata().Target.Digest)
 		return nil
 	},
 }

@@ -19,6 +19,7 @@ package containerdosstore
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/v2/client"
@@ -29,21 +30,60 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 )
 
+type MountOpts struct {
+	sOpts  []snapshots.Opt
+	aOpts  []ApplyCommitOpt
+	unpack bool
+}
+
+type MountOpt func(*MountOpts) error
+
+func WithMountUnpack() MountOpt {
+	return func(mOpts *MountOpts) error {
+		mOpts.unpack = true
+		return nil
+	}
+}
+
+func WithMountSnapshotOpts(opts ...snapshots.Opt) MountOpt {
+	return func(mOpts *MountOpts) error {
+		mOpts.sOpts = append(mOpts.sOpts, opts...)
+		return nil
+	}
+}
+
+func WithMountApplyCommitOpts(opts ...ApplyCommitOpt) MountOpt {
+	return func(mOpts *MountOpts) error {
+		mOpts.aOpts = append(mOpts.aOpts, opts...)
+		return nil
+	}
+}
+
 func (c *ContainerdOSStore) MountFromScratch(target string, key string) (string, error) {
 	return c.Mount(nil, target, key, false)
 }
 
-func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, readonly bool, opts ...snapshots.Opt) (snapshotKey string, retErr error) {
+func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, readonly bool, opts ...MountOpt) (snapshotKey string, retErr error) {
 	if !c.IsInitiated() {
 		return "", errors.New(missInitErrMsg)
 	}
 
-	if key == "" {
-		// TODO sanitize target string? this is a path, sould be fine but ugly
-		key = uniquePart() + "-" + target
+	mOpt := &MountOpts{
+		aOpts: []ApplyCommitOpt{},
+		sOpts: []snapshots.Opt{},
+	}
+	for _, o := range opts {
+		err := o(mOpt)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	// TODO add additional optional unpack step
+	if key == "" {
+		// TODO there is probably a better scheme, is target needed at all?
+		key = uniquePart() + "-" + strings.ReplaceAll(strings.Trim(target, "/"), "/", "-")
+	}
+
 	// TODO handle lease properly, whats the purpose of this setup?
 	ctx, done, err := c.cli.WithLease(c.ctx,
 		leases.WithID(key),
@@ -62,6 +102,15 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 
 	// TODO create and/or check target existence?
 
+	if mOpt.unpack {
+		err = c.unpack(ctx, img, mOpt.aOpts...)
+		if err != nil {
+			c.log.Errorf("failed to unpack image '%s': %v", img.Name(), err)
+			return "", err
+		}
+		c.log.Infof("Successfully unpacked image '%s'", img.Name())
+	}
+
 	var parent string
 	labels := map[string]string{
 		"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
@@ -73,6 +122,7 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 	} else {
 		diffIDs, err := img.RootFS(ctx)
 		if err != nil {
+			c.log.Errorf("failed to get diff IDs of the image '%s': %v", img.Name(), err)
 			return "", err
 		}
 		parent = identity.ChainID(diffIDs).String()
@@ -83,13 +133,13 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 
 	sn := c.cli.SnapshotService(c.driver)
 
-	opts = append(opts, snapshots.WithLabels(labels))
+	sOpts := append(mOpt.sOpts, snapshots.WithLabels(labels))
 
 	var mounts []mount.Mount
 	if readonly {
-		mounts, err = sn.View(ctx, key, parent, opts...)
+		mounts, err = sn.View(ctx, key, parent, sOpts...)
 	} else {
-		mounts, err = sn.Prepare(ctx, key, parent, opts...)
+		mounts, err = sn.Prepare(ctx, key, parent, sOpts...)
 	}
 
 	if err != nil {
@@ -97,14 +147,16 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 			mounts, err = sn.Mounts(ctx, key)
 		}
 		if err != nil {
+			c.log.Errorf("failed to create an active commit for image '%s': %v", img.Name(), err)
 			return "", err
 		}
 	}
 
 	if err := mount.All(mounts, target); err != nil {
 		if err := sn.Remove(ctx, key); err != nil && !errdefs.IsNotFound(err) {
-			return "", fmt.Errorf("error cleaning up snapshot after mount error: %v", err)
+			c.log.Errorf("error cleaning up snapshot after mount error: %v", err)
 		}
+		c.log.Errorf("failed to mount image '%s': %v", img.Name(), err)
 		return "", err
 	}
 

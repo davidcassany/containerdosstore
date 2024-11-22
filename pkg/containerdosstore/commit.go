@@ -51,23 +51,87 @@ type Changes struct {
 	CMD, Entrypoint []string
 }
 
-type Opts struct {
+type ImgOpts struct {
 	Author  string
 	Message string
 	Ref     string
 	Changes Changes
 }
 
-func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image, error) {
+type CommitImgOpts struct {
+	ApplyCommitOpts
+	iOpts ImgOpts
+	dOpts []diff.Opt
+}
+
+type ApplyCommitOpts struct {
+	sOpts []snapshots.Opt
+	aOpts []diff.ApplyOpt
+}
+
+type CommitImgOpt func(*CommitImgOpts) error
+type ApplyCommitOpt func(*ApplyCommitOpts) error
+
+func WithSnapshotsOpts(opts ...snapshots.Opt) ApplyCommitOpt {
+	return func(co *ApplyCommitOpts) error {
+		co.sOpts = append(co.sOpts, opts...)
+		return nil
+	}
+}
+
+func WithApplyOpts(opts ...diff.ApplyOpt) ApplyCommitOpt {
+	return func(co *ApplyCommitOpts) error {
+		co.aOpts = append(co.aOpts, opts...)
+		return nil
+	}
+}
+
+func WithApplyCommitOpts(opts ...ApplyCommitOpt) CommitImgOpt {
+	return func(co *CommitImgOpts) error {
+		for _, o := range opts {
+			err := o(&co.ApplyCommitOpts)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func WithImgOpts(iOpts ImgOpts) CommitImgOpt {
+	return func(co *CommitImgOpts) error {
+		co.iOpts = iOpts
+		return nil
+	}
+}
+
+func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
+	}
+
+	cOpt := &CommitImgOpts{
+		ApplyCommitOpts: ApplyCommitOpts{
+			sOpts: []snapshots.Opt{},
+			aOpts: []diff.ApplyOpt{},
+		},
+		dOpts: []diff.Opt{},
+	}
+	for _, o := range opts {
+		err := o(cOpt)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	sn := c.cli.SnapshotService(c.driver)
 	differ := c.cli.DiffService()
 	cs := c.cli.ContentStore()
 
-	info, err := sn.Stat(c.ctx, snapshotKey)
+	// TODO handle lease
+	oCtx := c.ctx
+
+	info, err := sn.Stat(oCtx, snapshotKey)
 	if err != nil {
 		return nil, err
 	}
@@ -76,17 +140,17 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 	var baseMfst *ocispec.Manifest
 
 	if imgRef, ok := info.Labels[LabelSnapshotImgRef]; ok {
-		baseImage, err := c.Get(imgRef)
+		baseImage, err := c.cli.GetImage(oCtx, imgRef)
 		if err != nil {
 			return nil, err
 		}
 
-		baseImgConfig, _, err = ReadImageConfig(c.ctx, baseImage)
+		baseImgConfig, _, err = ReadImageConfig(oCtx, baseImage)
 		if err != nil {
 			return nil, err
 		}
 
-		baseMfst, _, err = ReadManifest(c.ctx, baseImage)
+		baseMfst, _, err = ReadManifest(oCtx, baseImage)
 		if err != nil {
 			return nil, err
 		}
@@ -96,18 +160,18 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 
 	// TODO which is the dirty data to clean?
 	// Don't gc me and clean the dirty data after 1 hour!
-	ctx, done, err := c.cli.WithLease(c.ctx, leases.WithRandomID(), leases.WithExpiration(1*time.Hour))
+	ctx, done, err := c.cli.WithLease(oCtx, leases.WithRandomID(), leases.WithExpiration(1*time.Hour))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lease for commit: %w", err)
 	}
 	defer done(ctx)
 
-	diffLayerDesc, diffID, err := createDiff(ctx, snapshotKey, sn, c.cli.ContentStore(), differ)
+	diffLayerDesc, diffID, err := createDiff(ctx, snapshotKey, sn, c.cli.ContentStore(), differ, cOpt.dOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export layer: %w", err)
 	}
 
-	imageConfig, err := generateCommitImageConfig(baseImgConfig, diffID, opts)
+	imageConfig, err := generateCommitImageConfig(baseImgConfig, diffID, &cOpt.iOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate commit image config: %w", err)
 	}
@@ -125,7 +189,7 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 
 	// image create
 	img := images.Image{
-		Name:      opts.Ref,
+		Name:      cOpt.iOpts.Ref,
 		Target:    commitManifestDesc,
 		CreatedAt: time.Now(),
 	}
@@ -136,7 +200,7 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 		}
 
 		if _, err := c.cli.ImageService().Create(ctx, img); err != nil {
-			return nil, fmt.Errorf("failed to create new image %s: %w", opts.Ref, err)
+			return nil, fmt.Errorf("failed to create new image %s: %w", cOpt.iOpts.Ref, err)
 		}
 	}
 
@@ -150,8 +214,8 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts *Opts) (client.Image
 }
 
 // createDiff creates a layer diff into containerd's content store.
-func createDiff(ctx context.Context, name string, sn snapshots.Snapshotter, cs content.Store, comparer diff.Comparer) (ocispec.Descriptor, digest.Digest, error) {
-	newDesc, err := rootfs.CreateDiff(ctx, name, sn, comparer)
+func createDiff(ctx context.Context, name string, sn snapshots.Snapshotter, cs content.Store, comparer diff.Comparer, dOpts ...diff.Opt) (ocispec.Descriptor, digest.Digest, error) {
+	newDesc, err := rootfs.CreateDiff(ctx, name, sn, comparer, dOpts...)
 	if err != nil {
 		return ocispec.Descriptor{}, digest.Digest(""), err
 	}
@@ -179,7 +243,7 @@ func createDiff(ctx context.Context, name string, sn snapshots.Snapshotter, cs c
 }
 
 // generateCommitImageConfig returns commit oci image config based on the container's image.
-func generateCommitImageConfig(baseConfig ocispec.Image, diffID digest.Digest, opts *Opts) (ocispec.Image, error) {
+func generateCommitImageConfig(baseConfig ocispec.Image, diffID digest.Digest, opts *ImgOpts) (ocispec.Image, error) {
 	// TODO(fuweid): support updating the USER/ENV/... fields?
 	if opts.Changes.CMD != nil {
 		baseConfig.Config.Cmd = opts.Changes.CMD

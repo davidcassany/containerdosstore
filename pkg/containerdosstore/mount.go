@@ -43,7 +43,8 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 		key = uniquePart() + "-" + target
 	}
 
-	//TODO handle lease properly, whats the purpose of it?
+	// TODO add additional optional unpack step
+	// TODO handle lease properly, whats the purpose of this setup?
 	ctx, done, err := c.cli.WithLease(c.ctx,
 		leases.WithID(key),
 		leases.WithExpiration(24*time.Hour),
@@ -124,16 +125,19 @@ func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) er
 		return nil
 	}
 
-	if err := c.cli.LeasesService().Delete(c.ctx, leases.Lease{ID: key}); err != nil && !errdefs.IsNotFound(err) {
+	//TODO handle lease properly, is it acually meaningful deleteng the specific lease ID?
+	ctx := c.ctx
+
+	if err := c.cli.LeasesService().Delete(ctx, leases.Lease{ID: key}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("error deleting lease: %w", err)
 	}
 	s := c.cli.SnapshotService(c.driver)
 
 	// Remove up to a certain level of childs
 	if removeSnap > 0 {
-		removeSnapshotsChain(c.ctx, s, key, removeSnap-1)
+		removeSnapshotsChain(ctx, s, key, removeSnap-1)
 	}
 
 	// Remove the entire chain
-	return removeSnapshotsChain(c.ctx, s, key, -1)
+	return removeSnapshotsChain(ctx, s, key, -1)
 }

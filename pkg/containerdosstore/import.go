@@ -30,6 +30,9 @@ func (c *ContainerdOSStore) Import(reader io.Reader, opts ...client.ImportOpt) (
 		return nil, errors.New(missInitErrMsg)
 	}
 
+	// TODO add unpack option
+	// TODO handle lease
+
 	images := []client.Image{}
 	imgs, err := c.cli.Import(c.ctx, reader, opts...)
 	if err != nil {

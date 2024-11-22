@@ -56,19 +56,20 @@ func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) error 
 	}
 
 	//TODO handle lease
+	ctx := c.ctx
 
-	img, err := c.cli.GetImage(c.ctx, name)
+	img, err := c.cli.GetImage(ctx, name)
 	if err != nil {
 		return err
 	}
-	if ok, err := img.IsUnpacked(c.ctx, c.driver); ok {
-		diffIDs, err := img.RootFS(c.ctx)
+	if ok, err := img.IsUnpacked(ctx, c.driver); ok {
+		diffIDs, err := img.RootFS(ctx)
 		if err != nil {
 			return err
 		}
 		chainID := identity.ChainID(diffIDs).String()
 		sn := c.cli.SnapshotService(c.driver)
-		err = removeSnapshotsChain(c.ctx, sn, chainID, -1)
+		err = removeSnapshotsChain(ctx, sn, chainID, -1)
 		if err != nil {
 			return err
 		}
@@ -76,13 +77,15 @@ func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) error 
 		return err
 	}
 
-	return c.cli.ImageService().Delete(c.ctx, name, opts...)
+	return c.cli.ImageService().Delete(ctx, name, opts...)
 }
 
 func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
+
+	//TODO handle lease
 
 	i, err := c.cli.ImageService().Update(c.ctx, img, fieldpaths...)
 	if err != nil {
@@ -96,6 +99,8 @@ func (c *ContainerdOSStore) Create(img images.Image) (client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
+
+	//TODO handle lease
 
 	i, err := c.cli.ImageService().Create(c.ctx, img)
 	if err != nil {

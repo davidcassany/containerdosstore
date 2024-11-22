@@ -25,16 +25,16 @@ import (
 var commitCmd = &cobra.Command{
 	Use:     "commit SNAPSHOT_KEY IMAGE_NAME",
 	Short:   "Commit given active snapshot as a new image",
-	Args:    cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(1),
 	PreRunE: initCS,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapshotkey := args[0]
 		newRef := args[1]
 		log := cs.Logger()
 
-		opts := &containerdosstore.Opts{Ref: newRef}
+		iOpts := containerdosstore.ImgOpts{Ref: newRef}
 
-		newImg, err := cs.Commit(snapshotkey, opts)
+		newImg, err := cs.Commit(snapshotkey, containerdosstore.WithImgOpts(iOpts))
 		if err != nil {
 			return err
 		}
@@ -47,4 +47,7 @@ var commitCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(commitCmd)
+
+	commitCmd.Flags().String("image", "", "Name of the new image to commit")
+	commitCmd.MarkFlagRequired("image")
 }

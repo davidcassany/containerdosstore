@@ -27,6 +27,9 @@ func (c *ContainerdOSStore) Pull(ref string, opts ...client.RemoteOpt) (client.I
 		return nil, errors.New(missInitErrMsg)
 	}
 
+	// TODO disable unpack option and add additional unpack step
+	// TODO handle lease
+
 	img, err := c.cli.Pull(c.ctx, ref, opts...)
 	if err != nil {
 		return nil, err

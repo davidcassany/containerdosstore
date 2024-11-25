@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/errdefs"
 )
 
-func (c *ContainerdOSStore) ListSnapshots(filters ...string) (_ []snapshots.Info, retErr error) {
+func (c *OCIStore) ListSnapshots(filters ...string) (_ []snapshots.Info, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -53,7 +53,7 @@ func (c *ContainerdOSStore) ListSnapshots(filters ...string) (_ []snapshots.Info
 	return infos, err
 }
 
-func (c *ContainerdOSStore) GetSnapshot(key string) (_ snapshots.Info, retErr error) {
+func (c *OCIStore) GetSnapshot(key string) (_ snapshots.Info, retErr error) {
 	var info snapshots.Info
 	if !c.IsInitiated() {
 		return info, errors.New(missInitErrMsg)
@@ -75,7 +75,7 @@ func (c *ContainerdOSStore) GetSnapshot(key string) (_ snapshots.Info, retErr er
 	return sn.Stat(c.ctx, key)
 }
 
-func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...string) (_ snapshots.Info, retErr error) {
+func (c *OCIStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...string) (_ snapshots.Info, retErr error) {
 	if !c.IsInitiated() {
 		return info, errors.New(missInitErrMsg)
 	}
@@ -102,7 +102,7 @@ func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...st
 	return info, nil
 }
 
-func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string) (retErr error) {
+func (c *OCIStore) LabelSnapshot(name string, labels map[string]string) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -135,7 +135,7 @@ func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string)
 	return nil
 }
 
-func (c *ContainerdOSStore) RemoveSnapshotLabels(name string, labelKeys ...string) (retErr error) {
+func (c *OCIStore) RemoveSnapshotLabels(name string, labelKeys ...string) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -183,7 +183,7 @@ func listSnapshots(ctx context.Context, sn snapshots.Snapshotter, filters ...str
 	return snaps, nil
 }
 
-func (c *ContainerdOSStore) removeSnapshotsChain(ctx context.Context, s snapshots.Snapshotter, key string, depth int) error {
+func (c *OCIStore) removeSnapshotsChain(ctx context.Context, s snapshots.Snapshotter, key string, depth int) error {
 	var walkFunc func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error
 
 	walkFunc = func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error {
@@ -212,12 +212,12 @@ func (c *ContainerdOSStore) removeSnapshotsChain(ctx context.Context, s snapshot
 	return walkFunc(ctx, s, key, 0)
 }
 
-func (c *ContainerdOSStore) updateSnapshot(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+func (c *OCIStore) updateSnapshot(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	sn := c.cli.SnapshotService(c.driver)
 	return sn.Update(ctx, info, fieldpaths...)
 }
 
-func (c *ContainerdOSStore) removeSnapshotLabels(ctx context.Context, info snapshots.Info, labelKeys ...string) (snapshots.Info, error) {
+func (c *OCIStore) removeSnapshotLabels(ctx context.Context, info snapshots.Info, labelKeys ...string) (snapshots.Info, error) {
 	sLabels := info.Labels
 	if sLabels == nil {
 		sLabels = map[string]string{}
@@ -230,7 +230,7 @@ func (c *ContainerdOSStore) removeSnapshotLabels(ctx context.Context, info snaps
 	return c.updateSnapshot(ctx, info)
 }
 
-func (c *ContainerdOSStore) labelSnapshot(ctx context.Context, info snapshots.Info, labels map[string]string) (snapshots.Info, error) {
+func (c *OCIStore) labelSnapshot(ctx context.Context, info snapshots.Info, labels map[string]string) (snapshots.Info, error) {
 	sLabels := info.Labels
 	if sLabels == nil {
 		sLabels = map[string]string{}

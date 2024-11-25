@@ -1,4 +1,4 @@
-module github.com/davidcassany/containerdosstore
+module github.com/davidcassany/ocistore
 
 go 1.22.7
 

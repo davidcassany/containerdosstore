@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"bytes"
@@ -105,7 +105,7 @@ func WithImgCommitOpts(iOpts ImgOpts) CommitImgOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (_ client.Image, retErr error) {
+func (c *OCIStore) Commit(snapshotKey string, opts ...CommitImgOpt) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}

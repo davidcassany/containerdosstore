@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"context"
@@ -28,7 +28,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (c *ContainerdOSStore) Unpack(img client.Image, opts ...ApplyCommitOpt) (retErr error) {
+func (c *OCIStore) Unpack(img client.Image, opts ...ApplyCommitOpt) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -55,7 +55,7 @@ func (c *ContainerdOSStore) Unpack(img client.Image, opts ...ApplyCommitOpt) (re
 	return nil
 }
 
-func (c *ContainerdOSStore) unpack(ctx context.Context, img client.Image, opts ...ApplyCommitOpt) error {
+func (c *OCIStore) unpack(ctx context.Context, img client.Image, opts ...ApplyCommitOpt) error {
 	if ok, err := img.IsUnpacked(ctx, c.driver); !ok {
 		if err != nil {
 			return err

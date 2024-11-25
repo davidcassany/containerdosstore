@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func WithImportApplyCommitOpts(opts ...ApplyCommitOpt) ImportOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Import(reader io.Reader, opts ...ImportOpt) (_ []client.Image, retErr error) {
+func (c *OCIStore) Import(reader io.Reader, opts ...ImportOpt) (_ []client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -81,7 +81,7 @@ func (c *ContainerdOSStore) Import(reader io.Reader, opts ...ImportOpt) (_ []cli
 	return images, nil
 }
 
-func (c *ContainerdOSStore) ImportFile(file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
+func (c *OCIStore) ImportFile(file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -108,7 +108,7 @@ func (c *ContainerdOSStore) ImportFile(file string, opts ...ImportOpt) (_ []clie
 	return images, nil
 }
 
-func (c *ContainerdOSStore) SingleImportFile(file string, opts ...ImportOpt) (_ client.Image, retErr error) {
+func (c *OCIStore) SingleImportFile(file string, opts ...ImportOpt) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -158,7 +158,7 @@ func (c *ContainerdOSStore) SingleImportFile(file string, opts ...ImportOpt) (_ 
 	return images[0], nil
 }
 
-func (c *ContainerdOSStore) importFunc(ctx context.Context, reader io.Reader, opts ...ImportOpt) ([]client.Image, error) {
+func (c *OCIStore) importFunc(ctx context.Context, reader io.Reader, opts ...ImportOpt) ([]client.Image, error) {
 	// TODO add unpack option
 	iOpts := &ImportOpts{
 		iOpts: []client.ImportOpt{},
@@ -195,7 +195,7 @@ func (c *ContainerdOSStore) importFunc(ctx context.Context, reader io.Reader, op
 	return images, nil
 }
 
-func (c *ContainerdOSStore) importFile(ctx context.Context, file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
+func (c *OCIStore) importFile(ctx context.Context, file string, opts ...ImportOpt) (_ []client.Image, retErr error) {
 	r, err := os.Open(file)
 	if err != nil {
 		return nil, err

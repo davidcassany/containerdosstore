@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
 	"github.com/containerd/platforms"
-	"github.com/davidcassany/containerdosstore/pkg/logger"
+	"github.com/davidcassany/ocistore/pkg/logger"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )
@@ -53,7 +53,7 @@ const (
 	missInitErrMsg = "uninitiated containerdstore instance"
 )
 
-type ContainerdOSStore struct {
+type OCIStore struct {
 	log  logger.Logger
 	root string
 
@@ -67,18 +67,18 @@ type ContainerdOSStore struct {
 	cli *client.Client
 }
 
-func NewContainerdOSStore(log logger.Logger, root string) ContainerdOSStore {
-	return ContainerdOSStore{
+func NewOCIStore(log logger.Logger, root string) OCIStore {
+	return OCIStore{
 		root: root, driver: overlayDriver, namespace: namespace,
 		log: log, platform: platforms.DefaultStrict(),
 	}
 }
 
-func (c ContainerdOSStore) Logger() logger.Logger {
+func (c OCIStore) Logger() logger.Logger {
 	return c.log
 }
 
-func (c *ContainerdOSStore) Init() error {
+func (c *OCIStore) Init() error {
 	var err error
 	snapshotters := map[string]snapshots.Snapshotter{}
 
@@ -130,18 +130,18 @@ func (c *ContainerdOSStore) Init() error {
 	return nil
 }
 
-func (c *ContainerdOSStore) IsInitiated() bool {
+func (c *OCIStore) IsInitiated() bool {
 	return c.ctx != nil
 }
 
-func (c *ContainerdOSStore) GetClient() *client.Client {
+func (c *OCIStore) GetClient() *client.Client {
 	if !c.IsInitiated() {
 		return nil
 	}
 	return c.cli
 }
 
-func (c *ContainerdOSStore) GetDriver() string {
+func (c *OCIStore) GetDriver() string {
 	if !c.IsInitiated() {
 		return ""
 	}

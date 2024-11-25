@@ -16,7 +16,7 @@ limitations under the License.
 
 package main
 
-import "github.com/davidcassany/containerdosstore/cmd"
+import "github.com/davidcassany/ocistore/cmd"
 
 func main() {
 	cmd.Execute()

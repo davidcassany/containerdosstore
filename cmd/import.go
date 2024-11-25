@@ -17,7 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
+	"github.com/davidcassany/ocistore/pkg/ocistore"
 	"github.com/spf13/cobra"
 )
 
@@ -33,9 +33,9 @@ var importCmd = &cobra.Command{
 		unpack, _ := flags.GetBool("unpack")
 		file := args[0]
 
-		opts := []containerdosstore.ImportOpt{}
+		opts := []ocistore.ImportOpt{}
 		if unpack {
-			opts = append(opts, containerdosstore.WithImportUnpack())
+			opts = append(opts, ocistore.WithImportUnpack())
 		}
 
 		_, err := cs.ImportFile(file, opts...)

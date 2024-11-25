@@ -19,16 +19,16 @@ package cmd
 import (
 	"os"
 
-	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
-	"github.com/davidcassany/containerdosstore/pkg/logger"
+	"github.com/davidcassany/ocistore/pkg/logger"
+	"github.com/davidcassany/ocistore/pkg/ocistore"
 	"github.com/spf13/cobra"
 )
 
-var cs containerdosstore.ContainerdOSStore
+var cs ocistore.OCIStore
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "containerdosstore",
+	Use:   "ocistore",
 	Short: "A daememon less client for a local image containerd store",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
@@ -65,12 +65,12 @@ func initCS(cmd *cobra.Command, args []string) error {
 		log, _ = logger.NewLogger(logger.InfoLevel)
 	}
 
-	cs = containerdosstore.NewContainerdOSStore(log, root)
+	cs = ocistore.NewOCIStore(log, root)
 	return cs.Init()
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("root", containerdosstore.DefaultRoot, "path for the containerd local store")
+	rootCmd.PersistentFlags().String("root", ocistore.DefaultRoot, "path for the containerd local store")
 	rootCmd.PersistentFlags().Bool("debug", false, "set log ouput to debug level")
 	rootCmd.PersistentFlags().String("loglevel", "", "set log ouput level")
 	rootCmd.MarkFlagsMutuallyExclusive("debug", "loglevel")

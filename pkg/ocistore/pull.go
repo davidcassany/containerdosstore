@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"errors"
@@ -52,7 +52,7 @@ func WithPullApplyCommitOpts(opts ...ApplyCommitOpt) PullOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Pull(ref string, opts ...PullOpt) (_ client.Image, retErr error) {
+func (c *OCIStore) Pull(ref string, opts ...PullOpt) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}

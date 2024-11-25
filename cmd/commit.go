@@ -17,7 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
+	"github.com/davidcassany/ocistore/pkg/ocistore"
 	"github.com/spf13/cobra"
 )
 
@@ -32,9 +32,9 @@ var commitCmd = &cobra.Command{
 		image, _ := flags.GetString("image")
 		snapshotkey := args[0]
 
-		iOpts := containerdosstore.ImgOpts{Ref: image}
+		iOpts := ocistore.ImgOpts{Ref: image}
 
-		_, err := cs.Commit(snapshotkey, containerdosstore.WithImgCommitOpts(iOpts))
+		_, err := cs.Commit(snapshotkey, ocistore.WithImgCommitOpts(iOpts))
 		if err != nil {
 			return err
 		}

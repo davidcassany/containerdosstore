@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"errors"
@@ -59,11 +59,11 @@ func WithMountApplyCommitOpts(opts ...ApplyCommitOpt) MountOpt {
 	}
 }
 
-func (c *ContainerdOSStore) MountFromScratch(target string, key string) (string, error) {
+func (c *OCIStore) MountFromScratch(target string, key string) (string, error) {
 	return c.Mount(nil, target, key, false)
 }
 
-func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, readonly bool, opts ...MountOpt) (snapshotKey string, retErr error) {
+func (c *OCIStore) Mount(img client.Image, target string, key string, readonly bool, opts ...MountOpt) (snapshotKey string, retErr error) {
 	if !c.IsInitiated() {
 		return "", errors.New(missInitErrMsg)
 	}
@@ -163,7 +163,7 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 	return key, nil
 }
 
-func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) (retErr error) {
+func (c *OCIStore) Umount(target string, key string, removeSnap int) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}

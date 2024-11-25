@@ -18,7 +18,7 @@ package cmd
 
 import (
 	"github.com/containerd/containerd/v2/client"
-	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
+	"github.com/davidcassany/ocistore/pkg/ocistore"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +49,9 @@ var mountCmd = &cobra.Command{
 			return nil
 		}
 
-		mOpts := []containerdosstore.MountOpt{}
+		mOpts := []ocistore.MountOpt{}
 		if unpack {
-			mOpts = append(mOpts, containerdosstore.WithMountUnpack())
+			mOpts = append(mOpts, ocistore.WithMountUnpack())
 		}
 
 		img, err = cs.Get(name)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package containerdosstore
+package ocistore
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 )
 
-func (c *ContainerdOSStore) Get(ref string) (client.Image, error) {
+func (c *OCIStore) Get(ref string) (client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -38,7 +38,7 @@ func (c *ContainerdOSStore) Get(ref string) (client.Image, error) {
 	return img, nil
 }
 
-func (c *ContainerdOSStore) List(filters ...string) ([]client.Image, error) {
+func (c *OCIStore) List(filters ...string) ([]client.Image, error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -51,7 +51,7 @@ func (c *ContainerdOSStore) List(filters ...string) ([]client.Image, error) {
 	return images, nil
 }
 
-func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) (retErr error) {
+func (c *OCIStore) Delete(name string, opts ...images.DeleteOpt) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -78,7 +78,7 @@ func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) (retEr
 	return nil
 }
 
-func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (_ client.Image, retErr error) {
+func (c *OCIStore) Update(img images.Image, fieldpaths ...string) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -103,7 +103,7 @@ func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (_ cl
 	return client.NewImage(c.cli, i), nil
 }
 
-func (c *ContainerdOSStore) Create(img images.Image) (_ client.Image, retErr error) {
+func (c *OCIStore) Create(img images.Image) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -128,7 +128,7 @@ func (c *ContainerdOSStore) Create(img images.Image) (_ client.Image, retErr err
 	return client.NewImage(c.cli, i), nil
 }
 
-func (c *ContainerdOSStore) delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+func (c *OCIStore) delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
 	img, err := c.cli.GetImage(ctx, name)
 	if err != nil {
 		return err

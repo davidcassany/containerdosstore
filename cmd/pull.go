@@ -17,7 +17,7 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/davidcassany/containerdosstore/pkg/containerdosstore"
+	"github.com/davidcassany/ocistore/pkg/ocistore"
 	"github.com/spf13/cobra"
 )
 
@@ -30,10 +30,10 @@ var pullCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		flags := cmd.Flags()
 		unpack, _ := flags.GetBool("unpack")
-		pOpts := []containerdosstore.PullOpt{}
+		pOpts := []ocistore.PullOpt{}
 
 		if unpack {
-			pOpts = append(pOpts, containerdosstore.WithPullUnpack())
+			pOpts = append(pOpts, ocistore.WithPullUnpack())
 		}
 
 		_, err := cs.Pull(args[0], pOpts...)

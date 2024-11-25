@@ -28,15 +28,24 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func (c *ContainerdOSStore) Unpack(img client.Image, opts ...ApplyCommitOpt) error {
+func (c *ContainerdOSStore) Unpack(img client.Image, opts ...ApplyCommitOpt) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease for unpacking '%s': %v", img.Name(), err)
+		return err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease for unpack operation")
+		}
+	}()
 
-	err := c.unpack(ctx, img, opts...)
+	err = c.unpack(ctx, img, opts...)
 	if err != nil {
 		c.log.Errorf("failed to unpack image '%s': %v", img.Name(), err)
 		return err

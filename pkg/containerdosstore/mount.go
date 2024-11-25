@@ -163,7 +163,7 @@ func (c *ContainerdOSStore) Mount(img client.Image, target string, key string, r
 	return key, nil
 }
 
-func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) error {
+func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
@@ -177,8 +177,17 @@ func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) er
 		return nil
 	}
 
-	//TODO handle lease properly, is it acually meaningful deleteng the specific lease ID?
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to umount snapshot: %v", err)
+		return err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on umount snapshot operation")
+		}
+	}()
 
 	if err := c.cli.LeasesService().Delete(ctx, leases.Lease{ID: key}); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("error deleting lease: %w", err)
@@ -187,9 +196,9 @@ func (c *ContainerdOSStore) Umount(target string, key string, removeSnap int) er
 
 	// Remove up to a certain level of childs
 	if removeSnap > 0 {
-		removeSnapshotsChain(ctx, s, key, removeSnap-1)
+		c.removeSnapshotsChain(ctx, s, key, removeSnap-1)
 	}
 
 	// Remove the entire chain
-	return removeSnapshotsChain(ctx, s, key, -1)
+	return c.removeSnapshotsChain(ctx, s, key, -1)
 }

@@ -52,7 +52,7 @@ func WithPullApplyCommitOpts(opts ...ApplyCommitOpt) PullOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Pull(ref string, opts ...PullOpt) (client.Image, error) {
+func (c *ContainerdOSStore) Pull(ref string, opts ...PullOpt) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -85,8 +85,17 @@ func (c *ContainerdOSStore) Pull(ref string, opts ...PullOpt) (client.Image, err
 		rOpts = append(rOpts[:i], rOpts[i+1:]...)
 	}
 
-	// TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to pull image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on pull operation")
+		}
+	}()
 
 	img, err := c.cli.Pull(ctx, ref, rOpts...)
 	if err != nil {

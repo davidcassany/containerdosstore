@@ -25,16 +25,26 @@ import (
 	"github.com/containerd/errdefs"
 )
 
-func (c *ContainerdOSStore) ListSnapshots(filters ...string) ([]snapshots.Info, error) {
+func (c *ContainerdOSStore) ListSnapshots(filters ...string) (_ []snapshots.Info, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to list snapshots: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on list snapshots operation")
+		}
+	}()
 
 	sn := c.cli.SnapshotService(c.driver)
 
-	infos, err := listSnapshots(c.ctx, sn, filters...)
+	infos, err := listSnapshots(ctx, sn, filters...)
 	if err != nil && errdefs.IsNotFound(err) {
 		c.log.Warnf("returned a IsNotFound error, this is likely to mean no snapshot has been ever created yet in current content store")
 		return infos, nil
@@ -43,26 +53,46 @@ func (c *ContainerdOSStore) ListSnapshots(filters ...string) ([]snapshots.Info, 
 	return infos, err
 }
 
-func (c *ContainerdOSStore) GetSnapshot(key string) (snapshots.Info, error) {
+func (c *ContainerdOSStore) GetSnapshot(key string) (_ snapshots.Info, retErr error) {
 	var info snapshots.Info
 	if !c.IsInitiated() {
 		return info, errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to get snapshot: %v", err)
+		return info, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on get snapshot operation")
+		}
+	}()
 
 	sn := c.cli.SnapshotService(c.driver)
 	return sn.Stat(c.ctx, key)
 }
 
-func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
+func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...string) (_ snapshots.Info, retErr error) {
 	if !c.IsInitiated() {
 		return info, errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to update snapshot: %v", err)
+		return info, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on update snapshot operation")
+		}
+	}()
 
-	info, err := c.updateSnapshot(c.ctx, info, fieldpaths...)
+	info, err = c.updateSnapshot(c.ctx, info, fieldpaths...)
 	if err != nil {
 		c.log.Errorf("failed to update snapshot '%s': %v", info.Name, err)
 		return info, err
@@ -72,13 +102,22 @@ func (c *ContainerdOSStore) UpdateSnapshot(info snapshots.Info, fieldpaths ...st
 	return info, nil
 }
 
-func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string) error {
+func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to get snapshot: %v", err)
+		return err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on get snapshot operation")
+		}
+	}()
 
 	sn := c.cli.SnapshotService(c.driver)
 	info, err := sn.Stat(ctx, name)
@@ -96,13 +135,22 @@ func (c *ContainerdOSStore) LabelSnapshot(name string, labels map[string]string)
 	return nil
 }
 
-func (c *ContainerdOSStore) RemoveSnapshotLabels(name string, labelKeys ...string) error {
+func (c *ContainerdOSStore) RemoveSnapshotLabels(name string, labelKeys ...string) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to get snapshot: %v", err)
+		return err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on get snapshot operation")
+		}
+	}()
 
 	sn := c.cli.SnapshotService(c.driver)
 	info, err := sn.Stat(ctx, name)
@@ -135,14 +183,14 @@ func listSnapshots(ctx context.Context, sn snapshots.Snapshotter, filters ...str
 	return snaps, nil
 }
 
-func removeSnapshotsChain(ctx context.Context, s snapshots.Snapshotter, key string, depth int) error {
+func (c *ContainerdOSStore) removeSnapshotsChain(ctx context.Context, s snapshots.Snapshotter, key string, depth int) error {
 	var walkFunc func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error
 
 	walkFunc = func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error {
 		sInfo, err := s.Stat(ctx, key)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
-				// TODO add warning logs here
+				c.log.Warnf("stopped walking chain, snapshot '%s' not found", key)
 				return nil
 			}
 			return err

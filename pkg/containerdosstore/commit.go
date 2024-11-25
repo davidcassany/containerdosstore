@@ -105,7 +105,7 @@ func WithImgCommitOpts(iOpts ImgOpts) CommitImgOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (client.Image, error) {
+func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
@@ -128,10 +128,20 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (cl
 	differ := c.cli.DiffService()
 	cs := c.cli.ContentStore()
 
-	// TODO handle lease
-	oCtx := c.ctx
+	// TODO which is the dirty data to clean?
+	// Don't gc me and clean the dirty data after 1 hour!
+	ctx, done, err := c.cli.WithLease(c.ctx, leases.WithRandomID(), leases.WithExpiration(1*time.Hour))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lease for commit: %w", err)
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on update image operation")
+		}
+	}()
 
-	info, err := sn.Stat(oCtx, snapshotKey)
+	info, err := sn.Stat(ctx, snapshotKey)
 	if err != nil {
 		return nil, err
 	}
@@ -140,31 +150,23 @@ func (c *ContainerdOSStore) Commit(snapshotKey string, opts ...CommitImgOpt) (cl
 	var baseMfst *ocispec.Manifest
 
 	if imgRef, ok := info.Labels[LabelSnapshotImgRef]; ok {
-		baseImage, err := c.cli.GetImage(oCtx, imgRef)
+		baseImage, err := c.cli.GetImage(ctx, imgRef)
 		if err != nil {
 			return nil, err
 		}
 
-		baseImgConfig, _, err = ReadImageConfig(oCtx, baseImage)
+		baseImgConfig, _, err = ReadImageConfig(ctx, baseImage)
 		if err != nil {
 			return nil, err
 		}
 
-		baseMfst, _, err = ReadManifest(oCtx, baseImage)
+		baseMfst, _, err = ReadManifest(ctx, baseImage)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// TODO ensure all content for baseImage
-
-	// TODO which is the dirty data to clean?
-	// Don't gc me and clean the dirty data after 1 hour!
-	ctx, done, err := c.cli.WithLease(oCtx, leases.WithRandomID(), leases.WithExpiration(1*time.Hour))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create lease for commit: %w", err)
-	}
-	defer done(ctx)
 
 	diffLayerDesc, diffID, err := createDiff(ctx, snapshotKey, sn, c.cli.ContentStore(), differ, cOpt.dOpts...)
 	if err != nil {

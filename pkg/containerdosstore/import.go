@@ -55,13 +55,22 @@ func WithImportApplyCommitOpts(opts ...ApplyCommitOpt) ImportOpt {
 	}
 }
 
-func (c *ContainerdOSStore) Import(reader io.Reader, opts ...ImportOpt) ([]client.Image, error) {
+func (c *ContainerdOSStore) Import(reader io.Reader, opts ...ImportOpt) (_ []client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	// TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to import image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on import operation")
+		}
+	}()
 
 	images, err := c.importFunc(ctx, reader, opts...)
 	if err != nil {
@@ -77,8 +86,17 @@ func (c *ContainerdOSStore) ImportFile(file string, opts ...ImportOpt) (_ []clie
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	// TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to import image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on import operation")
+		}
+	}()
 
 	images, err := c.importFile(ctx, file, opts...)
 	if err != nil {
@@ -95,8 +113,17 @@ func (c *ContainerdOSStore) SingleImportFile(file string, opts ...ImportOpt) (_ 
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	// TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to import image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on import operation")
+		}
+	}()
 
 	images, err := c.importFile(ctx, file, opts...)
 	if err != nil {

@@ -51,15 +51,24 @@ func (c *ContainerdOSStore) List(filters ...string) ([]client.Image, error) {
 	return images, nil
 }
 
-func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) error {
+func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) (retErr error) {
 	if !c.IsInitiated() {
 		return errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
-	ctx := c.ctx
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to delete image: %v", err)
+		return err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on delete image operation")
+		}
+	}()
 
-	err := c.delete(ctx, name, opts...)
+	err = c.delete(ctx, name, opts...)
 	if err != nil {
 		c.log.Errorf("failed deleting image '%s': %v", name, err)
 		return err
@@ -69,14 +78,24 @@ func (c *ContainerdOSStore) Delete(name string, opts ...images.DeleteOpt) error 
 	return nil
 }
 
-func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (client.Image, error) {
+func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to update image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on update image operation")
+		}
+	}()
 
-	i, err := c.cli.ImageService().Update(c.ctx, img, fieldpaths...)
+	i, err := c.cli.ImageService().Update(ctx, img, fieldpaths...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,14 +103,24 @@ func (c *ContainerdOSStore) Update(img images.Image, fieldpaths ...string) (clie
 	return client.NewImage(c.cli, i), nil
 }
 
-func (c *ContainerdOSStore) Create(img images.Image) (client.Image, error) {
+func (c *ContainerdOSStore) Create(img images.Image) (_ client.Image, retErr error) {
 	if !c.IsInitiated() {
 		return nil, errors.New(missInitErrMsg)
 	}
 
-	//TODO handle lease
+	ctx, done, err := c.cli.WithLease(c.ctx)
+	if err != nil {
+		c.log.Errorf("failed to create lease to create image: %v", err)
+		return nil, err
+	}
+	defer func() {
+		err = done(ctx)
+		if err != nil && retErr == nil {
+			c.log.Warnf("could not remove lease on create image operation")
+		}
+	}()
 
-	i, err := c.cli.ImageService().Create(c.ctx, img)
+	i, err := c.cli.ImageService().Create(ctx, img)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +140,7 @@ func (c *ContainerdOSStore) delete(ctx context.Context, name string, opts ...ima
 		}
 		chainID := identity.ChainID(diffIDs).String()
 		sn := c.cli.SnapshotService(c.driver)
-		err = removeSnapshotsChain(ctx, sn, chainID, -1)
+		err = c.removeSnapshotsChain(ctx, sn, chainID, -1)
 		if err != nil {
 			return err
 		}

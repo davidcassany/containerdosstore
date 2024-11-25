@@ -56,6 +56,7 @@ type ImgOpts struct {
 	Message string
 	Ref     string
 	Changes Changes
+	Labels  map[string]string
 }
 
 type CommitImgOpts struct {
@@ -189,11 +190,17 @@ func (c *OCIStore) Commit(snapshotKey string, opts ...CommitImgOpt) (_ client.Im
 		return nil, err
 	}
 
+	imgLabels := map[string]string{}
+	if len(cOpt.iOpts.Labels) > 0 {
+		imgLabels = cOpt.iOpts.Labels
+	}
+
 	// image create
 	img := images.Image{
 		Name:      cOpt.iOpts.Ref,
 		Target:    commitManifestDesc,
 		CreatedAt: time.Now(),
+		Labels:    imgLabels,
 	}
 
 	if _, err := c.cli.ImageService().Update(ctx, img); err != nil {

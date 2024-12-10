@@ -78,11 +78,11 @@ func (c OCIStore) Logger() logger.Logger {
 	return c.log
 }
 
-func (c *OCIStore) Init() error {
+func (c *OCIStore) Init(mainCtx context.Context) error {
 	var err error
 	snapshotters := map[string]snapshots.Snapshotter{}
 
-	ctx := namespaces.WithNamespace(context.TODO(), "testing")
+	ctx := namespaces.WithNamespace(mainCtx, "testing")
 
 	switch c.driver {
 	case overlayDriver:

@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"os"
 
 	"github.com/davidcassany/ocistore/pkg/logger"
@@ -66,7 +67,7 @@ func initCS(cmd *cobra.Command, args []string) error {
 	}
 
 	cs = ocistore.NewOCIStore(log, root)
-	return cs.Init()
+	return cs.Init(context.Background())
 }
 
 func init() {

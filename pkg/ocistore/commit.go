@@ -180,7 +180,7 @@ func (c *OCIStore) Commit(snapshotKey string, opts ...CommitImgOpt) (_ client.Im
 	}
 
 	rootfsID := identity.ChainID(imageConfig.RootFS.DiffIDs).String()
-	if err := applyDiffLayer(ctx, rootfsID, baseImgConfig, sn, differ, diffLayerDesc); err != nil {
+	if err := applyDiffLayer(ctx, rootfsID, snapshotKey, sn, differ, diffLayerDesc); err != nil {
 		return nil, fmt.Errorf("failed to apply diff: %w", err)
 	}
 
@@ -370,32 +370,20 @@ func writeContentsForImage(ctx context.Context, cs content.Store, snName string,
 }
 
 // applyDiffLayer will apply diff layer content created by createDiff into the snapshotter.
-func applyDiffLayer(ctx context.Context, name string, baseImg ocispec.Image, sn snapshots.Snapshotter, differ diff.Applier, diffDesc ocispec.Descriptor) (retErr error) {
-	var (
-		key    = uniquePart() + "-" + name
-		parent = identity.ChainID(baseImg.RootFS.DiffIDs).String()
-	)
-
-	mount, err := sn.Prepare(ctx, key, parent)
+func applyDiffLayer(ctx context.Context, name string, snapshotKey string, sn snapshots.Snapshotter, differ diff.Applier, diffDesc ocispec.Descriptor) (retErr error) {
+	mounts, err := sn.Mounts(ctx, snapshotKey)
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		if retErr != nil {
-			// NOTE: the snapshotter should be hold by lease. Even
-			// if the cleanup fails, the containerd gc can delete it.
-			if err := sn.Remove(ctx, key); err != nil {
-				// TODO log warn failed to cleanup aborted apply key: err
-			}
-		}
-	}()
-
-	if _, err = differ.Apply(ctx, diffDesc, mount); err != nil {
+	if _, err = differ.Apply(ctx, diffDesc, mounts); err != nil {
 		return err
 	}
 
-	if err = sn.Commit(ctx, name, key); err != nil {
+	// Label added here is just to be consistent with unpacked images, I don't know the motivation of this label
+	if err = sn.Commit(ctx, name, snapshotKey, snapshots.WithLabels(map[string]string{
+		"containerd.io/snapshot.ref": name,
+	})); err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			return nil
 		}

@@ -187,6 +187,7 @@ func (c *OCIStore) removeSnapshotsChain(ctx context.Context, s snapshots.Snapsho
 	var walkFunc func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error
 
 	walkFunc = func(ctx context.Context, s snapshots.Snapshotter, key string, step int) error {
+		c.log.Debugf("removing snapshots chain step %d", step)
 		sInfo, err := s.Stat(ctx, key)
 		if err != nil {
 			if errdefs.IsNotFound(err) {

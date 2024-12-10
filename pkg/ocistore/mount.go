@@ -196,7 +196,7 @@ func (c *OCIStore) Umount(target string, key string, removeSnap int) (retErr err
 
 	// Remove up to a certain level of childs
 	if removeSnap > 0 {
-		c.removeSnapshotsChain(ctx, s, key, removeSnap-1)
+		return c.removeSnapshotsChain(ctx, s, key, removeSnap-1)
 	}
 
 	// Remove the entire chain
